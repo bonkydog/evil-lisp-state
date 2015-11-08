@@ -24,6 +24,8 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+;; Crudely hacked on by Brian Jenkins to make it more suitable for use with Clojure
+
 ;;; Commentary:
 
 ;; Adds a new Evil state called --LISP-- (<L>) with mnemonics key bindings
@@ -180,6 +182,10 @@ If `evil-lisp-state-global' is non nil then this variable has no effect."
     (":"   . evil-ex)
     ("("   . lisp-state-insert-sexp-before)
     (")"   . lisp-state-insert-sexp-after)
+    ("["   . lisp-state-insert-vector-before)
+    ("]"   . lisp-state-insert-vector-after)
+    ("{"   . lisp-state-insert-map-before)
+    ("}"   . lisp-state-insert-map-after)
     ("$"   . sp-end-of-sexp)
     ("`k"  . sp-kill-hybrid-sexp)
     ("`p"  . sp-push-hybrid-sexp)
@@ -228,7 +234,10 @@ If `evil-lisp-state-global' is non nil then this variable has no effect."
     ("v"   . evil-visual-char)
     ("V"   . evil-visual-line)
     ("C-v" . evil-visual-block)
-    ("w"   . lisp-state-wrap)
+    ("ww"  . lisp-state-wrap-with-parens)
+    ("w("  . lisp-state-wrap-with-parens)
+    ("w["  . lisp-state-wrap-with-squares)
+    ("w{"  . lisp-state-wrap-with-curlies)
     ("W"   . sp-unwrap-sexp)
     ("y"   . sp-copy-sexp))
   "alist of keys and commands in lisp state.")
@@ -255,19 +264,29 @@ If `evil-lisp-state-global' is non nil then this variable has no effect."
       (evil-normal-state)
     (evil-lisp-state)))
 
-(defun lisp-state-wrap (&optional arg)
+(defun lisp-state-wrap-with-parens (&optional arg)
   "Wrap a symbol with parenthesis."
   (interactive "P")
   (sp-wrap-with-pair "("))
+
+(defun lisp-state-wrap-with-squares (&optional arg)
+  "Wrap a symbol with square brackets."
+  (interactive "P")
+  (sp-wrap-with-pair "["))
+
+(defun lisp-state-wrap-with-curlies (&optional arg)
+  "Wrap a symbol with curly brackets."
+  (interactive "P")
+  (sp-wrap-with-pair "{"))
 
 (defun evil-lisp-state-next-paren (&optional closing)
   "Go to the next/previous closing/opening parenthesis."
   (if closing
       (let ((curr (point)))
         (forward-char)
-        (unless (eq curr (search-forward ")"))
+        (unless (eq curr (search-forward-regexp "\\[\\|(\\|{"))
           (backward-char)))
-    (search-backward "(")))
+    (search-backward-regexp "]\\|)\\|}")))
 
 (defun lisp-state-prev-opening-paren ()
   "Go to the next closing parenthesis."
@@ -308,6 +327,54 @@ If `evil-lisp-state-global' is non nil then this variable has no effect."
     (evil-end-of-line)
     (insert " ")
     (sp-insert-pair "(")
+    (indent-for-tab-command)))
+
+(defun lisp-state-insert-map-after ()
+  "Insert map after the current sexp."
+  (interactive)
+  (let ((sp-navigate-consider-symbols nil))
+    (if (char-equal (char-after) ?\() (forward-char))
+    (sp-up-sexp)
+    (evil-insert-state)
+    (sp-newline)
+    (sp-insert-pair "{")))
+
+(defun lisp-state-insert-map-before ()
+  "Insert map before the current sexp."
+  (interactive)
+  (let ((sp-navigate-consider-symbols nil))
+    (if (char-equal (char-after) ?\() (forward-char))
+    (sp-backward-sexp)
+    (evil-insert-state)
+    (sp-newline)
+    (evil-previous-visual-line)
+    (evil-end-of-line)
+    (insert " ")
+    (sp-insert-pair "{")
+    (indent-for-tab-command)))
+
+(defun lisp-state-insert-vector-after ()
+  "Insert vector after the current sexp."
+  (interactive)
+  (let ((sp-navigate-consider-symbols nil))
+    (if (char-equal (char-after) ?\() (forward-char))
+    (sp-up-sexp)
+    (evil-insert-state)
+    (sp-newline)
+    (sp-insert-pair "[")))
+
+(defun lisp-state-insert-vector-before ()
+  "Insert vector before the current sexp."
+  (interactive)
+  (let ((sp-navigate-consider-symbols nil))
+    (if (char-equal (char-after) ?\() (forward-char))
+    (sp-backward-sexp)
+    (evil-insert-state)
+    (sp-newline)
+    (evil-previous-visual-line)
+    (evil-end-of-line)
+    (insert " ")
+    (sp-insert-pair "[")
     (indent-for-tab-command)))
 
 (defun lisp-state-eval-sexp-end-of-line ()
